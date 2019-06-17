@@ -58,13 +58,13 @@ int send_response(int fd, char *header, char *content_type, void *body, int cont
     char *c_time_string = ctime(&current_time);
 
     sprintf(response, "%s\n"
-                      "Date: %s\n"
                       "Content-Type: %s\n"
                       "Content-Length: %d\n"
                       "Connection: close\n"
+                      "Date: %s\n"
                       "\n"  // <- don't forget the blank line to indicate end of HTTP header
                       "%s", // <- body
-            header, c_time_string, content_type, content_length, body);
+            header, content_type, content_length, c_time_string, body);
 
     int response_length = strlen(response);
 
@@ -171,23 +171,30 @@ void handle_http_request(int fd, struct cache *cache)
     // Read the first two components of the first line of the request
     char method[200];
     char path[8192];
+    char http_version[512];
 
-    sscanf("method: %s\n", method);
-    sscanf("path: %s\n", path);
+    sscanf(request, "%s %s %s", method, path, http_version);
 
-    // // If GET, handle the get endpoints
-    // if (method == "GET")
-    // {
-    // }
-    // // Check if it's /d20 and handle that special case
-    // else if (method == "GET")
-    // {
-    // }
-    // // Otherwise serve the requested file by calling get_file()
-    // else
-    // {
-    // }
-    // (Stretch) If POST, handle the post request
+    // If GET, handle the get endpoints
+    if (strcmp(method, "GET") == 0)
+    {
+        if (strcmp(path, "/d20") == 0)
+        {
+            get_d20(fd);
+        }
+        else
+        {
+            get_file(fd, cache, path);
+        }
+    }
+    else if (strcmp(method, "POST") == 0)
+    {
+        return;
+    }
+    else
+    {
+        resp_404(fd);
+    }
 }
 
 /**
@@ -229,8 +236,6 @@ int main(void)
             perror("accept");
             continue;
         }
-
-        resp_404(newfd);
 
         // Print out a message that we got the connection
         inet_ntop(their_addr.ss_family,
