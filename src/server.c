@@ -127,7 +127,6 @@ void resp_404(int fd)
  */
 void get_file(int fd, struct cache *cache, char *request_path)
 {
-    // fd, cache, request_path
     char file_path[4096];
     struct file_data *filedata;
     char *mime_type;
@@ -138,17 +137,13 @@ void get_file(int fd, struct cache *cache, char *request_path)
     snprintf(file_path, sizeof file_path, path, SERVER_ROOT);
     filedata = file_load(file_path);
 
-    printf("%s\n", filedata->data);
-
     if (filedata == NULL)
     {
-        // TODO: make this non-fatal
-        fprintf(stderr, "cannot find system 404 file\n");
-        exit(3);
+        resp_404(fd);
     }
 
-    mime_type = mime_type_get(request_path);
-    send_response(fd, "HTTP/1.1 200 OK\n", mime_type, filedata->data, filedata->size);
+    mime_type = mime_type_get(file_path);
+    send_response(fd, "HTTP/1.1 200 OK", mime_type, filedata->data, filedata->size);
 
     file_free(filedata);
 }
