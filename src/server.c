@@ -62,8 +62,8 @@ int send_response(int fd, char *header, char *content_type, void *body, int cont
                       "Content-Length: %d\n"
                       "Connection: close\n"
                       "Date: %s\n"
-                      "\n"  // <- don't forget the blank line to indicate end of HTTP header
-                      "%s", // <- body
+                      "\n"    // <- don't forget the blank line to indicate end of HTTP header
+                      "%s\n", // <- body
             header, content_type, content_length, c_time_string, body);
 
     int response_length = strlen(response);
@@ -85,16 +85,14 @@ int send_response(int fd, char *header, char *content_type, void *body, int cont
 void get_d20(int fd)
 {
     // Generate a random number between 1 and 20 inclusive
-
-    ///////////////////
-    // IMPLEMENT ME! //
-    ///////////////////
+    int random_num = (rand() % 20) + 1;
+    char str_num[56];
+    sprintf(str_num, "%d", random_num);
+    int size = sizeof(str_num);
 
     // Use send_response() to send it back as text/plain data
-
-    ///////////////////
-    // IMPLEMENT ME! //
-    ///////////////////
+    // fd, header, content_type, body, content_length
+    send_response(fd, "HTTP/1.1 200 OK", "text/plain", str_num, size);
 }
 
 /**
@@ -184,13 +182,14 @@ void handle_http_request(int fd, struct cache *cache)
         }
         else
         {
-            get_file(fd, cache, path);
+            resp_404(fd);
+            // get_file(fd, cache, path);
         }
     }
-    else if (strcmp(method, "POST") == 0)
-    {
-        return;
-    }
+    // else if (strcmp(method, "POST") == 0)
+    // {
+    //     return;
+    // }
     else
     {
         resp_404(fd);
