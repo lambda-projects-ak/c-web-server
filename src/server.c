@@ -57,24 +57,32 @@ int send_response(int fd, char *header, char *content_type, void *body, int cont
     time_t current_time = time(NULL);
     char *c_time_string = ctime(&current_time);
 
-    sprintf(response, "%s\n"
-                      "Content-Type: %s\n"
-                      "Content-Length: %d\n"
-                      "Connection: close\n"
-                      "Date: %s\n"
-                      "\n"    // <- don't forget the blank line to indicate end of HTTP header
-                      "%s\n", // <- body
-            header, content_type, content_length, c_time_string, body);
+    int response_length = sprintf(response,
+                                  "%s\n"
+                                  "Content-Type: %s\n"
+                                  "Content-Length: %d\n"
+                                  "Connection: close\n"
+                                  "Date: %s\n"
+                                  "\n", // <- don't forget the blank line to indicate end of HTTP header
+                                  header, content_type, content_length, c_time_string);
+    // this adds content to the body and accomidates images (1s and 0s) and bytes
+    // but its slow, O(n) for the copy
+    // memcpy(response + response_length, body, content_length);
+    // response_length += content_length;
 
-    int response_length = strlen(response);
+    // finish this section to send body after header is sent.3
 
-    // Send it all!
+    // Send header!
     int rv = send(fd, response, response_length, 0);
 
     if (rv < 0)
-    {
         perror("send");
-    }
+
+    // Send body!
+    rv = send(fd, body, content_length, 0);
+
+    if (rv < 0)
+        perror("send");
 
     return rv;
 }
@@ -85,10 +93,10 @@ int send_response(int fd, char *header, char *content_type, void *body, int cont
 void get_d20(int fd)
 {
     // Generate a random number between 1 and 20 inclusive
-    int random_num = (rand() % 20) + 1;
+    int random_num = rand() % 20 + 1;
     char str_num[56];
-    sprintf(str_num, "%d", random_num);
-    int size = sizeof(str_num);
+    // sprintf returns length of data stored into the array.
+    int size = sprintf(str_num, "%d", random_num);
 
     // Use send_response() to send it back as text/plain data
     // fd, header, content_type, body, content_length
@@ -123,26 +131,47 @@ void resp_404(int fd)
 }
 
 /**
+ * Send a cat image
+ */
+void get_cat(int fd)
+{
+    char filepath[4096];
+    struct file_data *filedata;
+    char *mime_type;
+
+    // Fetch the cat.png file
+    snprintf(filepath, sizeof filepath, "%s/cat.png", SERVER_ROOT);
+    filedata = file_load(filepath);
+
+    if (filedata == NULL)
+    {
+        // TODO: make this non-fatal
+        fprintf(stderr, "cannot find cat file\n");
+        exit(3);
+    }
+
+    mime_type = mime_type_get(filepath);
+    send_response(fd, "HTTP/1.1 200 OK", mime_type, filedata->data, filedata->size);
+
+    file_free(filedata);
+}
+
+/**
  * Read and return a file from disk or cache
  */
 void get_file(int fd, struct cache *cache, char *request_path)
 {
-    char file_path[4096];
+    char filepath[4096];
     struct file_data *filedata;
     char *mime_type;
 
-    char path[512];
-    sprintf(path, "%s%s", SERVER_ROOT, request_path);
-
-    snprintf(file_path, sizeof file_path, path, SERVER_ROOT);
-    filedata = file_load(file_path);
+    snprintf(filepath, sizeof filepath, "%s%s", SERVER_ROOT, request_path);
+    filedata = file_load(filepath);
 
     if (filedata == NULL)
-    {
         resp_404(fd);
-    }
 
-    mime_type = mime_type_get(file_path);
+    mime_type = mime_type_get(filepath);
     send_response(fd, "HTTP/1.1 200 OK", mime_type, filedata->data, filedata->size);
 
     file_free(filedata);
@@ -188,22 +217,18 @@ void handle_http_request(int fd, struct cache *cache)
     if (strcmp(method, "GET") == 0)
     {
         if (strcmp(path, "/d20") == 0)
-        {
             get_d20(fd);
-        }
+        else if (strcmp(path, "/cat") == 0)
+            get_cat(fd);
         else
-        {
             get_file(fd, cache, path);
-        }
     }
     // else if (strcmp(method, "POST") == 0)
     // {
     //     return;
     // }
     else
-    {
         resp_404(fd);
-    }
 }
 
 /**
