@@ -131,32 +131,6 @@ void resp_404(int fd)
 }
 
 /**
- * Send a cat image
- */
-void get_cat(int fd)
-{
-    char filepath[4096];
-    struct file_data *filedata;
-    char *mime_type;
-
-    // Fetch the cat.png file
-    snprintf(filepath, sizeof filepath, "%s/cat.png", SERVER_ROOT);
-    filedata = file_load(filepath);
-
-    if (filedata == NULL)
-    {
-        // TODO: make this non-fatal
-        fprintf(stderr, "cannot find cat file\n");
-        exit(3);
-    }
-
-    mime_type = mime_type_get(filepath);
-    send_response(fd, "HTTP/1.1 200 OK", mime_type, filedata->data, filedata->size);
-
-    file_free(filedata);
-}
-
-/**
  * Read and return a file from disk or cache
  */
 void get_file(int fd, struct cache *cache, char *request_path)
@@ -169,7 +143,10 @@ void get_file(int fd, struct cache *cache, char *request_path)
     filedata = file_load(filepath);
 
     if (filedata == NULL)
+    {
         resp_404(fd);
+        return;
+    }
 
     mime_type = mime_type_get(filepath);
     send_response(fd, "HTTP/1.1 200 OK", mime_type, filedata->data, filedata->size);
@@ -218,17 +195,17 @@ void handle_http_request(int fd, struct cache *cache)
     {
         if (strcmp(path, "/d20") == 0)
             get_d20(fd);
-        else if (strcmp(path, "/cat") == 0)
-            get_cat(fd);
         else
             get_file(fd, cache, path);
     }
-    // else if (strcmp(method, "POST") == 0)
+    else
+        resp_404(fd);
+
+    // stretch - implement post endpoint
+    // (strcmp(method, "POST") == 0)
     // {
     //     return;
     // }
-    else
-        resp_404(fd);
 }
 
 /**
